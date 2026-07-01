@@ -85,6 +85,10 @@ internal static class ConfigManager
         public string ArrowColor { get; set; } = "purple";
         public bool ShowArrows { get; set; } = true;
         public string FontSize { get; set; } = "";
+        // When > 0, every option row is centered to this many characters and a horizontal rule of
+        // the same width is drawn under the title and above the key hints, so the menu box keeps a
+        // constant width instead of shrinking/growing with the selected item's text. 0 = off.
+        public int FixedWidth { get; set; } = 0;
         public bool FreezePlayer { get; set; }
         public bool LookToScroll { get; set; }
         public bool Scrollbar { get; set; } = true;
@@ -223,6 +227,7 @@ internal static class ConfigManager
         Config.WasdMenu.ArrowColor = wasdMenu.GetValueOrDefault("ArrowColor", Config.WasdMenu.ArrowColor);
         Config.WasdMenu.ShowArrows = wasdMenu.GetValueOrDefault("ShowArrows", Config.WasdMenu.ShowArrows);
         Config.WasdMenu.FontSize = wasdMenu.GetValueOrDefault("FontSize", Config.WasdMenu.FontSize);
+        Config.WasdMenu.FixedWidth = Math.Max(0, wasdMenu.GetValueOrDefault("FixedWidth", Config.WasdMenu.FixedWidth));
         Config.WasdMenu.FreezePlayer = wasdMenu.GetValueOrDefault("FreezePlayer", Config.WasdMenu.FreezePlayer);
         Config.WasdMenu.LookToScroll = wasdMenu.GetValueOrDefault("LookToScroll", Config.WasdMenu.LookToScroll);
         Config.WasdMenu.Scrollbar = wasdMenu.GetValueOrDefault("Scrollbar", Config.WasdMenu.Scrollbar);

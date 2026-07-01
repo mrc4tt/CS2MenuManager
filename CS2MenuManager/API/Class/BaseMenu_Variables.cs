@@ -61,6 +61,7 @@ public abstract partial class BaseMenu
     private string _wasdMenuArrowColor = Config.WasdMenu.ArrowColor;
     private bool _wasdMenuShowArrows = Config.WasdMenu.ShowArrows;
     private string _wasdMenuFontSize = Config.WasdMenu.FontSize;
+    private int _wasdMenuFixedWidth = Config.WasdMenu.FixedWidth;
     private bool _wasdMenuFreezePlayer = Config.WasdMenu.FreezePlayer;
     private bool _wasdMenuLookToScroll = Config.WasdMenu.LookToScroll;
     private bool _wasdMenuScrollbar = Config.WasdMenu.Scrollbar;
@@ -374,6 +375,16 @@ public abstract partial class BaseMenu
     {
         get => _wasdMenuFontSize;
         set => _wasdMenuFontSize = ConditionalSet(Config.WasdMenu.FontSize, value);
+    }
+
+    /// <summary>
+    /// When &gt; 0, option rows are centered to this width (in characters) and a horizontal rule of
+    /// the same width frames the options, giving the menu a constant, filled box width. 0 = off.
+    /// </summary>
+    public int WasdMenu_FixedWidth
+    {
+        get => _wasdMenuFixedWidth;
+        set => _wasdMenuFixedWidth = ConditionalSet(Config.WasdMenu.FixedWidth, value);
     }
 
     /// <summary>

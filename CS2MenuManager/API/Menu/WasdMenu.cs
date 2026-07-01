@@ -120,21 +120,32 @@ public class WasdMenuInstance : BaseMenuInstance
         int currentPage = Page + 1;
         builder.Append($"<font color='{wasdMenu.WasdMenu_TitleColor}'>{Menu.Title}</font> ({currentPage}/{totalPages})<br>");
 
+        // Fixed-width mode: center every option to a constant char width and frame the option block
+        // with a horizontal rule, so the menu box no longer resizes as the selection (and its arrows)
+        // moves between short and long items. 0 = off (original hug-the-text behavior).
+        int fixedWidth = wasdMenu.WasdMenu_FixedWidth;
+        bool pad = fixedWidth > 0;
+        string rule = pad ? $"<font color='{wasdMenu.WasdMenu_OptionColor}'>{new string('─', fixedWidth)}</font><br>" : string.Empty;
+
+        if (pad)
+            builder.Append(rule);
+
         int maxIndex = Math.Min(CurrentOffset + MenuItemsPerPage, Menu.ItemOptions.Count);
         int visibleCount = maxIndex - CurrentOffset;
         for (int i = CurrentOffset; i < maxIndex; i++)
         {
             ItemOption option = Menu.ItemOptions[i];
             string bar = ScrollbarPrefix(i - CurrentOffset, visibleCount, wasdMenu);
+            string text = pad ? CenterPad(option.Text, fixedWidth) : option.Text;
 
             if (i == CurrentChoiceIndex)
             {
                 builder.AppendLine(option.DisableOption switch
                 {
                     DisableOption.None =>
-                        $"{bar}{leftArrow} <font color='{wasdMenu.WasdMenu_SelectedOptionColor}'>{option.Text}</font> {rightArrow}<br>",
+                        $"{bar}{leftArrow} <font color='{wasdMenu.WasdMenu_SelectedOptionColor}'>{text}</font> {rightArrow}<br>",
                     DisableOption.DisableShowNumber or DisableOption.DisableHideNumber =>
-                        $"{bar}{leftArrow} <font color='{wasdMenu.WasdMenu_DisabledOptionColor}'>{option.Text}</font> {rightArrow}<br>",
+                        $"{bar}{leftArrow} <font color='{wasdMenu.WasdMenu_DisabledOptionColor}'>{text}</font> {rightArrow}<br>",
                     _ => string.Empty
                 });
             }
@@ -143,13 +154,16 @@ public class WasdMenuInstance : BaseMenuInstance
                 builder.AppendLine(option.DisableOption switch
                 {
                     DisableOption.None =>
-                        $"{bar}<font color='{wasdMenu.WasdMenu_OptionColor}'>{option.Text}</font><br>",
+                        $"{bar}<font color='{wasdMenu.WasdMenu_OptionColor}'>{text}</font><br>",
                     DisableOption.DisableShowNumber or DisableOption.DisableHideNumber =>
-                        $"{bar}<font color='{wasdMenu.WasdMenu_DisabledOptionColor}'>{option.Text}</font><br>",
+                        $"{bar}<font color='{wasdMenu.WasdMenu_DisabledOptionColor}'>{text}</font><br>",
                     _ => string.Empty
                 });
             }
         }
+
+        if (pad)
+            builder.Append(rule);
 
         List<string> buttomText =
         [
@@ -173,6 +187,28 @@ public class WasdMenuInstance : BaseMenuInstance
             content = $"<font class='fontSize-{wasdMenu.WasdMenu_FontSize}'>{content}</font>";
 
         DisplayString = content;
+    }
+
+    /// <summary>
+    /// Fits <paramref name="text"/> to <paramref name="width"/> characters: shorter text is centered
+    /// with non-breaking spaces (a regular space collapses in center-html); longer text is truncated
+    /// with a trailing ellipsis so a row never wraps to a second line (which would grow the box height
+    /// per menu and clip the key hints). The center-html font is proportional, so sizing is approximate
+    /// — pick a width with margin.
+    /// </summary>
+    private static string CenterPad(string text, int width)
+    {
+        int len = text.Length;
+        if (len > width)
+            return width <= 1 ? text[..width] : text[..(width - 1)] + "…";
+
+        if (len == width)
+            return text;
+
+        int total = width - len;
+        int left = total / 2;
+        int right = total - left;
+        return new string(' ', left) + text + new string(' ', right);
     }
 
     /// <summary>
