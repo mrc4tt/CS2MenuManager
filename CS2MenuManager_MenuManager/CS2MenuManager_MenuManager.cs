@@ -11,7 +11,7 @@ namespace CS2MenuManager_MenuManager;
 public class Config : BasePluginConfig
 {
     public string[] Commands { get; set; } = ["css_mm", "css_menumanager"];
-    public string[] ChangeMenuTypeCommands { get; set; } = ["css_menutype", "css_ct"];
+    public string[] ChangeMenuTypeCommands { get; set; } = ["css_menutype"];
     public MenuManager_Config MenuManagerConfig { get; set; } = new();
 
     public class MenuManager_Config
@@ -47,7 +47,12 @@ public class CS2MenuManager_Menu : BasePlugin, IPluginConfig<Config>
             AddCommand(command, "CS2MenuManager-MenuManager", Command_MenuManager);
 
         foreach (string command in config.ChangeMenuTypeCommands)
+        {
+            if (command == "css_ct")
+                continue;
+
             AddCommand(command, "CS2MenuManager-ChangeMenuType-Menu", Command_ChangeMenuType);
+        }
 
         foreach (string command in config.MenuManagerConfig.ReloadConfigCommands)
             AddCommand(command, "CS2MenuManager-ReloadConfig", Command_ReloadConfig);
