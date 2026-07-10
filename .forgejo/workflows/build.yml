@@ -72,20 +72,23 @@ jobs:
           NUGET_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          SOURCE="${GITHUB_SERVER_URL}/api/packages/${{ github.repository_owner }}/nuget/index.json"
-          echo "Pushing to $SOURCE"
-          # Forgejo/Gitea nuget registry wants HTTP basic auth, not the
-          # NuGet api-key header. Register the source with username+password
-          # (token as password) so push authenticates correctly.
-          dotnet nuget add source "$SOURCE" \
-            --name forgejo \
-            --username "${{ github.repository_owner }}" \
-            --password "$NUGET_TOKEN" \
-            --store-password-in-clear-text
-          dotnet nuget push nupkgs/*.nupkg \
-            --source forgejo \
-            --api-key "$NUGET_TOKEN" \
-            --skip-duplicate
+          # dotnet nuget push mis-handles Forgejo auth (sends api-key header,
+          # gets 401). Upload directly with a basic-auth PUT instead — same
+          # auth path as the release step below.
+          UPLOAD="${GITHUB_SERVER_URL}/api/packages/${{ github.repository_owner }}/nuget/"
+          for pkg in nupkgs/*.nupkg; do
+            echo "Uploading $pkg to $UPLOAD"
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+              --user "${{ github.repository_owner }}:${NUGET_TOKEN}" \
+              --upload-file "$pkg" \
+              "$UPLOAD")
+            # 201 = created, 409 = already exists (idempotent re-run) -> both OK
+            if [ "$STATUS" != "201" ] && [ "$STATUS" != "409" ]; then
+              echo "Error: upload failed with HTTP $STATUS"
+              exit 1
+            fi
+            echo "OK ($STATUS)"
+          done
 
       - name: Assemble runtime plugin tree
         run: |
