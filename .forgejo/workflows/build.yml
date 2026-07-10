@@ -67,13 +67,23 @@ jobs:
 
       - name: Push NuGet package to Forgejo registry
         env:
+          # Must be a PAT with `write:package` scope. The auto Actions token
+          # (GITHUB_TOKEN) usually lacks package-write -> 401 Unauthorized.
           NUGET_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           SOURCE="${GITHUB_SERVER_URL}/api/packages/${{ github.repository_owner }}/nuget/index.json"
           echo "Pushing to $SOURCE"
+          # Forgejo/Gitea nuget registry wants HTTP basic auth, not the
+          # NuGet api-key header. Register the source with username+password
+          # (token as password) so push authenticates correctly.
+          dotnet nuget add source "$SOURCE" \
+            --name forgejo \
+            --username "${{ github.repository_owner }}" \
+            --password "$NUGET_TOKEN" \
+            --store-password-in-clear-text
           dotnet nuget push nupkgs/*.nupkg \
-            --source "$SOURCE" \
+            --source forgejo \
             --api-key "$NUGET_TOKEN" \
             --skip-duplicate
 
