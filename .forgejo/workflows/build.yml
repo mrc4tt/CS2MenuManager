@@ -67,8 +67,8 @@ jobs:
 
       - name: Debug auth
         env:
-          NUGET_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN2 || secrets.GITHUB_TOKEN }}
-          HAS_RELEASE_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN2 != '' }}
+          NUGET_TOKEN: ${{ secrets.RELEASE_TOKEN2 }}
+          HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN2 != '' }}
         run: |
           set -euo pipefail
           echo "RELEASE_TOKEN secret set? $HAS_RELEASE_TOKEN"
@@ -85,7 +85,10 @@ jobs:
         env:
           # Must be a PAT with `write:package` scope. The auto Actions token
           # (GITHUB_TOKEN) usually lacks package-write -> 401 Unauthorized.
-          NUGET_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN2 || secrets.GITHUB_TOKEN }}
+          # NB: Forgejo/Gitea forbids secret names with a GITHUB_/GITEA_ prefix,
+          # so the PAT secret is RELEASE_TOKEN2 (no prefix). No GITHUB_TOKEN
+          # fallback: it silently masks an empty secret and 401s on package push.
+          NUGET_TOKEN: ${{ secrets.RELEASE_TOKEN2 }}
         run: |
           set -euo pipefail
           # dotnet nuget push mis-handles Forgejo auth (sends api-key header,
@@ -127,7 +130,7 @@ jobs:
       - name: Create Forgejo release (skip if tag exists)
         if: github.event_name != 'pull_request'
         env:
-          GITEA_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN2 || secrets.GITHUB_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.RELEASE_TOKEN2 }}
         run: |
           set -euo pipefail
           API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
