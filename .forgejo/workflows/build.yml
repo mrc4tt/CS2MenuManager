@@ -91,7 +91,7 @@ jobs:
           # dotnet nuget push mis-handles Forgejo auth (sends api-key header,
           # gets 401). Upload directly with a basic-auth PUT instead — same
           # auth path as the release step below.
-          UPLOAD="${GITHUB_SERVER_URL}/api/packages/${{ github.repository_owner }}/nuget/"
+          UPLOAD="${GITHUB_SERVER_URL}/api/packages/${{ github.repository_owner }}/nuget"
           for pkg in nupkgs/*.nupkg; do
             echo "Uploading $pkg to $UPLOAD"
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
