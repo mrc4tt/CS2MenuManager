@@ -35,6 +35,9 @@ jobs:
         run: |
           apt-get update
           apt-get install -y zip jq curl
+          # Runner has no IPv6 route; api.nuget.org resolves to AAAA first and
+          # `dotnet restore` fails with "Network is unreachable". Prefer IPv4.
+          echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
 
       - name: Derive version
         id: version
