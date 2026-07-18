@@ -35,7 +35,7 @@ internal static class Database
             Port = Config.MySQL.Port,
             Pooling = true,
             MinimumPoolSize = 0,
-            MaximumPoolSize = 640,
+            MaximumPoolSize = 64,
             ConnectionIdleTimeout = 30,
             AllowZeroDateTime = true
         }.ConnectionString;

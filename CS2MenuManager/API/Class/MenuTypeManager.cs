@@ -144,7 +144,7 @@ public static class MenuTypeManager
             menu.AddItem(menuType.Key, (p, _) =>
             {
                 SetPlayerMenuType(p, menuType.Value);
-                prevMenu?.Display(p, prevMenu.MenuTime);
+                prevMenu?.Display(p, GetActiveMenu(p)?.MenuTime ?? 0);
             });
         }
     }

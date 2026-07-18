@@ -100,25 +100,33 @@ internal static class ConfigManager
 
     public static Cfg Config { get; set; } = new();
     private static readonly string ConfigFilePath;
+    private static readonly string ConfigExampleFilePath;
 
     static ConfigManager()
     {
         string assemblyName = Assembly.GetExecutingAssembly().GetName().Name ?? string.Empty;
-        ConfigFilePath = Path.Combine(
+        string configDir = Path.Combine(
             Server.GameDirectory,
             "csgo",
             "addons",
             "counterstrikesharp",
             "shared",
-            assemblyName,
-            "config.toml"
+            assemblyName
         );
+        ConfigFilePath = Path.Combine(configDir, "config.toml");
+        ConfigExampleFilePath = Path.Combine(configDir, "config.example.toml");
     }
 
     public static void LoadConfig()
     {
+        // The build ships config.example.toml. Create aconfig.toml from it if missing one
         if (!File.Exists(ConfigFilePath))
-            throw new FileNotFoundException($"Configuration file not found: {ConfigFilePath}");
+        {
+            if (!File.Exists(ConfigExampleFilePath))
+                throw new FileNotFoundException($"Configuration file not found and no example to seed from: {ConfigFilePath}");
+
+            File.Copy(ConfigExampleFilePath, ConfigFilePath);
+        }
 
         string configText = File.ReadAllText(ConfigFilePath);
         TomlTable model = Toml.ToModel(configText);

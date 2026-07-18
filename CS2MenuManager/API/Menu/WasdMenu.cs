@@ -24,8 +24,7 @@ public class WasdMenu(string title, BasePlugin plugin) : BaseMenu(title, plugin)
     /// <param name="time">The duration for which the menu is displayed.</param>
     public override void Display(CCSPlayerController player, int time)
     {
-        MenuTime = time;
-        MenuManager.OpenMenu(player, this, null, (p, m) => new WasdMenuInstance(p, m));
+        MenuManager.OpenMenu(player, this, null, (p, m) => new WasdMenuInstance(p, m), time);
     }
 
     /// <summary>
@@ -36,8 +35,7 @@ public class WasdMenu(string title, BasePlugin plugin) : BaseMenu(title, plugin)
     /// <param name="time">The duration for which the menu is displayed.</param>
     public override void DisplayAt(CCSPlayerController player, int firstItem, int time)
     {
-        MenuTime = time;
-        MenuManager.OpenMenu(player, this, firstItem, (p, m) => new WasdMenuInstance(p, m));
+        MenuManager.OpenMenu(player, this, firstItem, (p, m) => new WasdMenuInstance(p, m), time);
     }
 }
 

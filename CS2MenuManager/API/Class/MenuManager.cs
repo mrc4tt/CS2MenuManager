@@ -118,7 +118,7 @@ public static class MenuManager
     /// <param name="menu">The menu to open.</param>
     /// <param name="firstItem">The index of the first item to display.</param>
     /// <param name="createInstance">The function to create a menu instance.</param>
-    public static void OpenMenu<TMenu>(CCSPlayerController player, TMenu menu, int? firstItem, Func<CCSPlayerController, TMenu, IMenuInstance> createInstance)
+    public static void OpenMenu<TMenu>(CCSPlayerController player, TMenu menu, int? firstItem, Func<CCSPlayerController, TMenu, IMenuInstance> createInstance, int time)
         where TMenu : IMenu
     {
         if (menu.ItemOptions.Count == 0)
@@ -130,12 +130,19 @@ public static class MenuManager
         EnsureHooks(menu.Plugin);
         CloseActiveMenu(player);
 
+        // Back-compat: honour the deprecated menu-level MenuTime only when no explicit duration was passed.
+#pragma warning disable CS0618
+        if (time == 0 && menu.MenuTime > 0)
+            time = menu.MenuTime;
+#pragma warning restore CS0618
+
         Server.NextFrame(() =>
         {
             IMenuInstance instance = createInstance.Invoke(player, menu);
 
             if (instance is BaseMenuInstance baseMenuInstance)
             {
+                baseMenuInstance.MenuTime = time;
                 baseMenuInstance.RegisterOnKeyPress();
                 baseMenuInstance.RegisterPlayerDisconnectEvent();
 
@@ -157,8 +164,8 @@ public static class MenuManager
                 }
             }
 
-            Timer? timer = menu.MenuTime > 0 ?
-                menu.Plugin.AddTimer(menu.MenuTime, () => CloseActiveMenu(player)) :
+            Timer? timer = time > 0 ?
+                menu.Plugin.AddTimer(time, () => CloseActiveMenu(player)) :
                 null;
 
             ActiveMenus[player.SteamID] = (instance, timer);

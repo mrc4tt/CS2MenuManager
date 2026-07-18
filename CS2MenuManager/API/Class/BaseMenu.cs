@@ -33,6 +33,7 @@ public abstract partial class BaseMenu(string title, BasePlugin plugin) : IMenu
     /// <summary>
     /// Gets or sets the time duration for which the menu is displayed.
     /// </summary>
+    [Obsolete("Pass the duration via Display(player, time). This menu-level property is no longer used for the auto-close timer (the instance's MenuTime is) and will be removed in a future version.")]
     public int MenuTime { get; set; }
 
     /// <summary>
@@ -133,6 +134,11 @@ public abstract class BaseMenuInstance(CCSPlayerController player, IMenu menu) :
     public CCSPlayerController Player { get; } = player;
 
     /// <summary>
+    /// Gets the display duration (in seconds) this instance was opened with; 0 means no auto-close.
+    /// </summary>
+    public int MenuTime { get; internal set; }
+
+    /// <summary>
     /// Gets or sets the current page number of the menu.
     /// </summary>
     public int Page { get; protected set; }
@@ -182,7 +188,7 @@ public abstract class BaseMenuInstance(CCSPlayerController player, IMenu menu) :
 
     internal void PrevSubMenu()
     {
-        menu.PrevMenu?.Display(Player, menu.PrevMenu.MenuTime);
+        menu.PrevMenu?.Display(Player, MenuTime);
     }
 
     /// <summary>

@@ -21,8 +21,7 @@ public class CenterHtmlMenu(string title, BasePlugin plugin) : BaseMenu(title, p
     /// <param name="time">The duration for which the menu is displayed.</param>
     public override void Display(CCSPlayerController player, int time)
     {
-        MenuTime = time;
-        MenuManager.OpenMenu(player, this, null, (p, m) => new CenterHtmlMenuInstance(p, m));
+        MenuManager.OpenMenu(player, this, null, (p, m) => new CenterHtmlMenuInstance(p, m), time);
     }
 
     /// <summary>
@@ -33,8 +32,7 @@ public class CenterHtmlMenu(string title, BasePlugin plugin) : BaseMenu(title, p
     /// <param name="time">The duration for which the menu is displayed.</param>
     public override void DisplayAt(CCSPlayerController player, int firstItem, int time)
     {
-        MenuTime = time;
-        MenuManager.OpenMenu(player, this, firstItem, (p, m) => new CenterHtmlMenuInstance(p, m));
+        MenuManager.OpenMenu(player, this, firstItem, (p, m) => new CenterHtmlMenuInstance(p, m), time);
     }
 }
 
@@ -61,6 +59,16 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
     protected override bool HasNextButton => Menu.ItemOptions.Count > NumPerPage + 1 && CurrentOffset + NumPerPage < Menu.ItemOptions.Count;
 
     /// <summary>
+    /// Cached rendered markup, rebuilt only when <see cref="_dirty"/> is set.
+    /// </summary>
+    private string _html = "";
+
+    /// <summary>
+    /// Indicates the cached markup is stale and must be rebuilt on the next tick.
+    /// </summary>
+    private bool _dirty = true;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="CenterHtmlMenuInstance"/> class.
     /// </summary>
     /// <param name="player">The player associated with this menu instance.</param>
@@ -71,13 +79,37 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
     }
 
     /// <summary>
-    /// Displays the menu to the player.
+    /// Marks the rendered markup stale. Invoked by the base navigation methods on any state change.
     /// </summary>
     public override void Display()
+    {
+        _dirty = true;
+    }
+
+    /// <summary>
+    /// Re-asserts the menu on the center HTML channel every tick so it survives other plugins
+    /// writing to the same channel, but rebuilds the markup only when the menu state has changed.
+    /// </summary>
+    private void OnTick()
     {
         if (Menu is not CenterHtmlMenu centerHtmlMenu)
             return;
 
+        // Stop drawing once this instance is no longer the player's active menu (closed/replaced).
+        if (!Player.IsValid || MenuManager.GetActiveMenu(Player) != this)
+            return;
+
+        if (_dirty)
+        {
+            _html = BuildHtml(centerHtmlMenu);
+            _dirty = false;
+        }
+
+        Player.PrintToCenterHtml(_html);
+    }
+
+    private string BuildHtml(CenterHtmlMenu centerHtmlMenu)
+    {
         StringBuilder builder = new();
         string title = centerHtmlMenu.Title.TruncateHtml(centerHtmlMenu.CenterHtmlMenu_MaxTitleLength);
         builder.Append($"<b><font color='{centerHtmlMenu.CenterHtmlMenu_TitleColor}'>{title}</font></b><br>");
