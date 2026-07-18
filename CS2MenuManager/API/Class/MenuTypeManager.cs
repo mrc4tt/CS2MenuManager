@@ -50,10 +50,9 @@ public static class MenuTypeManager
         if (MenuTypes.TryGetValue(player.SteamID, out Type? menuType))
             return menuType;
 
-        if (!IsMYSQLSet)
-            return GetDefaultMenu();
-
-        string? type = SelectMenu(player.SteamID).GetAwaiter().GetResult();
+        string? type = IsMYSQLSet
+            ? SelectMenu(player.SteamID).GetAwaiter().GetResult()
+            : LocalStore.Select(player.SteamID);
 
         if (string.IsNullOrEmpty(type))
             return GetDefaultMenu();
@@ -76,15 +75,15 @@ public static class MenuTypeManager
     {
         MenuTypes[player.SteamID] = menuType;
 
-        if (!IsMYSQLSet)
-            return menuType;
-
         string menuTypeStr = MenuTypesList.FirstOrDefault(x => x.Value == menuType).Key;
 
         if (menuTypeStr == null)
             return GetDefaultMenu();
 
-        Task.Run(async () => await InsertMenu(player.SteamID, menuTypeStr));
+        if (IsMYSQLSet)
+            Task.Run(async () => await InsertMenu(player.SteamID, menuTypeStr));
+        else
+            LocalStore.Insert(player.SteamID, menuTypeStr);
 
         return menuType;
     }

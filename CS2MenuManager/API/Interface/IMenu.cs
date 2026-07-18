@@ -26,8 +26,8 @@ public interface IMenu
 
     /// <summary>
     /// Gets or sets the time duration for which the menu is displayed.
-    [Obsolete("Pass the duration via Display(player, time). This menu-level property is no longer used for the auto-close timer (the instance's MenuTime is) and will be removed in a future version.")]
     /// </summary>
+    [Obsolete("Pass the duration via Display(player, time). This menu-level property is no longer used for the auto-close timer (the instance's MenuTime is) and will be removed in a future version.")]
     int MenuTime { get; set; }
 
     /// <summary>

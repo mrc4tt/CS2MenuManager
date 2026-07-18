@@ -119,7 +119,7 @@ internal static class ConfigManager
 
     public static void LoadConfig()
     {
-        // The build ships config.example.toml. Create aconfig.toml from it if missing one
+        // The build ships config.example.toml. Create config.toml from it if missing.
         if (!File.Exists(ConfigFilePath))
         {
             if (!File.Exists(ConfigExampleFilePath))

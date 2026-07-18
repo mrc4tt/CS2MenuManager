@@ -133,18 +133,7 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
         }
 
         AddPageOptions(centerHtmlMenu, builder);
-        _cachedDisplay = builder.ToString();
-    }
-
-    private void OnTick()
-    {
-        if (!Player.IsValid || MenuManager.GetActiveMenu(Player) != this)
-            return;
-
-        if (string.IsNullOrEmpty(_cachedDisplay))
-            Display();
-
-        Player.PrintToCenterHtml(_cachedDisplay);
+        return builder.ToString();
     }
 
     /// <summary>
@@ -154,7 +143,8 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
     {
         base.Close(exitSound);
         Menu.Plugin.RemoveListener<OnTick>(OnTick);
-        _cachedDisplay = string.Empty;
+        _html = string.Empty;
+        _dirty = true;
 
         if (Player.IsValid)
             Player.PrintToCenterHtml(" ");

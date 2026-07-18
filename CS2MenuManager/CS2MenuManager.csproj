@@ -1,17 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
+		<AssemblyName>CS2MenuManager</AssemblyName>
+		<RootNamespace>CS2MenuManager</RootNamespace>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<Title>CS2MenuManager</Title>
 		<Authors>schwarper</Authors>
 		<Description>CS2MenuManager is a flexible and user-friendly menu system developed for Counter-Strike 2 using the CounterStrikeSharp library. This project provides server administrators and developers with the ability to create customisable menus. It is easy to use for players and easy to configure and extend for administrators.</Description>
 		<Copyright>schwarper</Copyright>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<!-- nupkg produced explicitly by CI `dotnet pack`, not on every local build. -->
+		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+		<!-- No .xml doc file in BuildOutput. Re-enable if consumers need IntelliSense docs. -->
+		<GenerateDocumentationFile>false</GenerateDocumentationFile>
 		<RepositoryUrl>https://github.com/schwarper/CS2MenuManager</RepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
-		<IncludeXmlDocumentation>true</IncludeXmlDocumentation>
 		<OutputPath>$(ProjectDir)..\BuildOutput\shared\CS2MenuManager\</OutputPath>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 	</PropertyGroup>

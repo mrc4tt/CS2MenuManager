@@ -118,6 +118,7 @@ public static class MenuManager
     /// <param name="menu">The menu to open.</param>
     /// <param name="firstItem">The index of the first item to display.</param>
     /// <param name="createInstance">The function to create a menu instance.</param>
+    /// <param name="time">The auto-close duration in seconds; 0 disables the timer.</param>
     public static void OpenMenu<TMenu>(CCSPlayerController player, TMenu menu, int? firstItem, Func<CCSPlayerController, TMenu, IMenuInstance> createInstance, int time)
         where TMenu : IMenu
     {
