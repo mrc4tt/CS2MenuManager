@@ -8,10 +8,10 @@ public static class ProjectInfo
     /// <summary>
     /// Gets the current version of the CS2MenuManager.
     /// </summary>
-    public const string Version = "v43";
+    public const string Version = "v44";
 
     /// <summary>
     /// Gets the author of the CS2MenuManager.
     /// </summary>
-    public const string Author = "schwarper";
+    public const string Author = "schwarper (forked by Miksen)";
 }
