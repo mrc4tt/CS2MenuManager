@@ -65,6 +65,9 @@ DisabledOptionColor = "Grey"
 ArrowColor = "Purple"
 ShowArrows = true
 FontSize = ""
+# Font size for the key-hint footer line only (s, sm, m, l, xl, xxl).
+# Smaller than the body keeps "Exit" visible on small resolutions. Empty = same as FontSize.
+FooterFontSize = "s"
 FreezePlayer = false
 Scrollbar = true
 ScrollbarColor = "Purple"

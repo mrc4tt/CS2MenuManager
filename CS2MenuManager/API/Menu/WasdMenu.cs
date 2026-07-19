@@ -178,7 +178,10 @@ public class WasdMenuInstance : BaseMenuInstance
         if (HasExitButton)
             buttomText.Add($"<font color='{wasdMenu.WasdMenu_ExitKeyColor}'>{Player.Localizer("ExitKey", wasdMenu.WasdMenu_ExitKey)}</font>");
 
-        builder.AppendLine(string.Join(" | ", buttomText));
+        string footer = string.Join(" | ", buttomText);
+        if (!string.IsNullOrEmpty(wasdMenu.WasdMenu_FooterFontSize))
+            footer = $"<font class='fontSize-{wasdMenu.WasdMenu_FooterFontSize}'>{footer}</font>";
+        builder.AppendLine(footer);
 
         string content = builder.ToString();
         if (!string.IsNullOrEmpty(wasdMenu.WasdMenu_FontSize))

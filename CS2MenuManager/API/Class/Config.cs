@@ -85,6 +85,10 @@ internal static class ConfigManager
         public string ArrowColor { get; set; } = "purple";
         public bool ShowArrows { get; set; } = true;
         public string FontSize { get; set; } = "";
+        // Font size class for the key-hint footer line only ("W/S - Scroll | ..."). A smaller size
+        // than the menu body keeps the footer on one line so the exit hint isn't clipped by the
+        // fixed-height center-html panel. Empty = same size as the rest of the menu.
+        public string FooterFontSize { get; set; } = "s";
         // When > 0, every option row is centered to this many characters and a horizontal rule of
         // the same width is drawn under the title and above the key hints, so the menu box keeps a
         // constant width instead of shrinking/growing with the selected item's text. 0 = off.
@@ -235,6 +239,7 @@ internal static class ConfigManager
         Config.WasdMenu.ArrowColor = wasdMenu.GetValueOrDefault("ArrowColor", Config.WasdMenu.ArrowColor);
         Config.WasdMenu.ShowArrows = wasdMenu.GetValueOrDefault("ShowArrows", Config.WasdMenu.ShowArrows);
         Config.WasdMenu.FontSize = wasdMenu.GetValueOrDefault("FontSize", Config.WasdMenu.FontSize);
+        Config.WasdMenu.FooterFontSize = wasdMenu.GetValueOrDefault("FooterFontSize", Config.WasdMenu.FooterFontSize);
         Config.WasdMenu.FixedWidth = Math.Max(0, wasdMenu.GetValueOrDefault("FixedWidth", Config.WasdMenu.FixedWidth));
         Config.WasdMenu.FreezePlayer = wasdMenu.GetValueOrDefault("FreezePlayer", Config.WasdMenu.FreezePlayer);
         Config.WasdMenu.LookToScroll = wasdMenu.GetValueOrDefault("LookToScroll", Config.WasdMenu.LookToScroll);

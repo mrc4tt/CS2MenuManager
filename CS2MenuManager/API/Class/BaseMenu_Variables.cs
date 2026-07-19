@@ -61,6 +61,7 @@ public abstract partial class BaseMenu
     private string _wasdMenuArrowColor = Config.WasdMenu.ArrowColor;
     private bool _wasdMenuShowArrows = Config.WasdMenu.ShowArrows;
     private string _wasdMenuFontSize = Config.WasdMenu.FontSize;
+    private string _wasdMenuFooterFontSize = Config.WasdMenu.FooterFontSize;
     private int _wasdMenuFixedWidth = Config.WasdMenu.FixedWidth;
     private bool _wasdMenuFreezePlayer = Config.WasdMenu.FreezePlayer;
     private bool _wasdMenuLookToScroll = Config.WasdMenu.LookToScroll;
@@ -375,6 +376,17 @@ public abstract partial class BaseMenu
     {
         get => _wasdMenuFontSize;
         set => _wasdMenuFontSize = ConditionalSet(Config.WasdMenu.FontSize, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the center-html font size class for the key-hint footer line only.
+    /// A size smaller than <see cref="WasdMenu_FontSize"/> keeps the footer on one line so the
+    /// exit hint isn't clipped by the fixed-height panel. Empty = same size as the menu body.
+    /// </summary>
+    public string WasdMenu_FooterFontSize
+    {
+        get => _wasdMenuFooterFontSize;
+        set => _wasdMenuFooterFontSize = ConditionalSet(Config.WasdMenu.FooterFontSize, value);
     }
 
     /// <summary>
