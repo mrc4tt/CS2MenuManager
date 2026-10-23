@@ -1,0 +1,99 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**/README.md'
+      - '**/.gitignore'
+      - '**/LICENSE'
+  pull_request:
+
+# Builds CS2MenuManager and publishes a GitHub release with two assets:
+#   1. CS2MenuManager-<ver>.zip   -> runtime plugin (drop-in addons/counterstrikesharp
+#      tree; extract into game/csgo/).
+#   2. CS2MenuManager.<ver>.nupkg -> compile-time package for plugins that build
+#      against this net10.0 build (MatchZy vendors it as a local NuGet source).
+#
+# Version is derived from ProjectInfo.cs (`Version = "vNN"` -> 1.0.NN), the same
+# scheme schwarper publishes on nuget.org. The release step skips an existing tag,
+# so re-runs on the same version are no-ops.
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Derive version
+        id: version
+        run: |
+          set -euo pipefail
+          # ProjectInfo.cs holds e.g. `public const string Version = "v44";`
+          RAW=$(grep -oP 'Version\s*=\s*"v\K[0-9]+' CS2MenuManager/ProjectInfo.cs | head -1)
+          if [ -z "$RAW" ]; then
+            echo "Error: could not parse version from CS2MenuManager/ProjectInfo.cs"
+            exit 1
+          fi
+          VER="1.0.${RAW}"
+          echo "Version: $VER"
+          echo "VERSION=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Build solution
+        # Both projects carry explicit OutputPath (..\BuildOutput\{plugins,shared}\),
+        # so no -o here; that keeps the CSS drop-in layout intact.
+        run: dotnet build CS2MenuManager.sln -c Release
+
+      - name: Pack NuGet package
+        # --no-build: the csproj uses a custom OutputPath; letting pack rebuild
+        # trips NU5026 (packs before build lands the dll). Pack the artifacts the
+        # previous build step already produced.
+        run: |
+          dotnet pack CS2MenuManager/CS2MenuManager.csproj -c Release --no-build \
+            -p:PackageVersion=${{ steps.version.outputs.VERSION }} \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o nupkgs
+
+      - name: Assemble runtime plugin tree
+        run: |
+          set -euo pipefail
+          mkdir -p pkg/addons/counterstrikesharp
+          # csproj OutputPath ($(ProjectDir)..\BuildOutput\...) lands at the repo
+          # root, not under the project folder.
+          cp -r BuildOutput/plugins pkg/addons/counterstrikesharp/
+          cp -r BuildOutput/shared   pkg/addons/counterstrikesharp/
+          # GeneratePackageOnBuild drops a stray .nupkg into shared/; keep it out
+          # of the runtime zip.
+          find pkg -name '*.nupkg' -delete
+          echo ">> Runtime tree:"
+          find pkg -type f | sort
+
+      - name: Create release zip
+        run: |
+          cd pkg && zip -r "../CS2MenuManager-${{ steps.version.outputs.VERSION }}.zip" addons && cd ..
+
+      - name: Create GitHub release (skip if tag exists)
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.VERSION }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists. Skipping."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --target "${GITHUB_SHA}" \
+            --title "CS2MenuManager $TAG" \
+            --notes "Runtime plugin for CounterStrikeSharp (.NET 10): extract the zip into game/csgo/. The .nupkg is the compile-time package." \
+            "CS2MenuManager-${TAG}.zip" nupkgs/*.nupkg
