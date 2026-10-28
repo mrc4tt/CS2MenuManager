@@ -1,10 +1,8 @@
 ﻿using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Commands;
 using CS2MenuManager.API.Enum;
 using CS2MenuManager.API.Interface;
 using CS2MenuManager.API.Menu;
-using static CounterStrikeSharp.API.Modules.Commands.CommandInfo;
 
 namespace CS2MenuManager.API.Class;
 
@@ -184,7 +182,19 @@ public abstract class BaseMenuInstance(CCSPlayerController player, IMenu menu) :
     protected bool HasExitButton => Menu.ExitButton;
 
     internal int CurrentChoiceIndex;
-    private readonly Dictionary<string, CommandCallback> _keyCommands = [];
+
+    /// <summary>
+    /// Whether this instance is driven by the shared <c>css_0</c>..<c>css_9</c> commands
+    /// (chat / console / center-HTML menus). WASD menus use movement keys instead.
+    /// </summary>
+    internal virtual bool UsesKeyCommands => Menu is not WasdMenu;
+
+    /// <summary>
+    /// Called once per server tick by <see cref="MenuManager"/> while this instance is the
+    /// player's active menu. Instances no longer register their own <c>OnTick</c> listener;
+    /// one listener per plugin dispatches here.
+    /// </summary>
+    internal virtual void OnTickInternal() { }
 
     internal void PrevSubMenu()
     {
@@ -289,59 +299,6 @@ public abstract class BaseMenuInstance(CCSPlayerController player, IMenu menu) :
         }
     }
 
-    internal void RegisterOnKeyPress()
-    {
-        if (Menu is WasdMenu)
-            return;
-
-        for (int i = 0; i <= 9; i++)
-        {
-            int key = i;
-
-            _keyCommands[$"css_{i}"] = Func;
-            Menu.Plugin.AddCommand($"css_{i}", "Command Key Handler", Func);
-            continue;
-
-            void Func(CCSPlayerController? player, CommandInfo info)
-            {
-                if (player != Player)
-                    return;
-
-                MenuManager.OnKeyPress(player, key);
-            }
-        }
-    }
-
-    private void DeregisterOnKeyPress()
-    {
-        if (Menu is WasdMenu)
-            return;
-
-        foreach (KeyValuePair<string, CommandCallback> kvp in _keyCommands)
-            Menu.Plugin.RemoveCommand(kvp.Key, kvp.Value);
-
-        _keyCommands.Clear();
-    }
-
-    internal void RegisterPlayerDisconnectEvent()
-    {
-        Menu.Plugin.RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
-    }
-
-    private void DeregisterPlayerDisconnectEvent()
-    {
-        Menu.Plugin.DeregisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
-    }
-
-    private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
-    {
-        if (@event.Userid != Player)
-            return HookResult.Continue;
-
-        Close(false);
-        return HookResult.Continue;
-    }
-
     void IDisposable.Dispose()
     {
         Dispose(true);
@@ -358,8 +315,8 @@ public abstract class BaseMenuInstance(CCSPlayerController player, IMenu menu) :
 
         if (disposing)
         {
-            DeregisterOnKeyPress();
-            DeregisterPlayerDisconnectEvent();
+            // Key commands, the disconnect hook and the tick listener are per-plugin
+            // (MenuManager.EnsureHooks), so there is nothing native to tear down here.
             MenuManager.DisposeActiveMenu(Player);
         }
 

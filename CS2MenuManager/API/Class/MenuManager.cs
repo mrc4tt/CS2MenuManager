@@ -1,7 +1,11 @@
-﻿using CounterStrikeSharp.API;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Commands;
 using CS2MenuManager.API.Interface;
 using CS2MenuManager.API.Menu;
+using Microsoft.Extensions.Logging;
 using static CounterStrikeSharp.API.Core.Listeners;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 
@@ -13,23 +17,155 @@ namespace CS2MenuManager.API.Class;
 public static class MenuManager
 {
     private static readonly Dictionary<ulong, (IMenuInstance Instance, Timer? Timer)> ActiveMenus = [];
-    private static bool _hooksInstalled;
+
+    // Per-plugin hook state. Keyed weakly so an unloaded plugin's BasePlugin (and its
+    // AssemblyLoadContext) is not pinned by this shared static after CounterStrikeSharp
+    // has already torn its listeners/commands down.
+    private static readonly ConditionalWeakTable<BasePlugin, PluginHooks> Hooks = new();
     private static readonly object InitLock = new();
 
-    private static void EnsureHooks(BasePlugin plugin)
+    // Snapshot buffer for the per-tick dispatch. Reused so ticking allocates nothing;
+    // a snapshot is needed because a ticked instance may close itself (or open a
+    // different menu) and mutate ActiveMenus mid-iteration.
+    private static readonly List<IMenuInstance> TickBuffer = [];
+
+    /// <summary>
+    /// Any game-thread callback owned by this library that runs longer than this is logged
+    /// with its context, so regressions show up in the server log instead of only as
+    /// anonymous "slow server frame" warnings.
+    /// </summary>
+    internal const double SlowCallbackThresholdMs = 5.0;
+
+    private sealed class PluginHooks
     {
-        if (_hooksInstalled)
-            return;
+        public bool KeyCommandsRegistered;
+    }
+
+    /// <summary>
+    /// Installs the library's per-plugin hooks exactly once per <see cref="BasePlugin"/>.
+    /// </summary>
+    /// <remarks>
+    /// Everything that used to be registered per menu instance now lives here and is
+    /// registered once for the plugin's lifetime: the <c>OnTick</c> listener that drives
+    /// WASD / center-HTML menus, the disconnect handler, and (lazily, see
+    /// <see cref="EnsureKeyCommands"/>) the <c>css_0</c>..<c>css_9</c> commands.
+    /// <para>
+    /// Per-instance registration was the cause of the "slow server frame" stalls: each
+    /// menu open paid for a fresh native listener + event hook + FunctionReference stub,
+    /// and numbered menus additionally re-registered ten engine <c>ConCommand</c>s
+    /// (CounterStrikeSharp unregisters a command from the engine once its last definition
+    /// is removed, which the previous instance's close had just done). All of that ran
+    /// inside the <c>Server.NextFrame</c> callback that opens the menu.
+    /// </para>
+    /// </remarks>
+    private static PluginHooks EnsureHooks(BasePlugin plugin)
+    {
+        if (Hooks.TryGetValue(plugin, out PluginHooks? hooks))
+            return hooks;
 
         lock (InitLock)
         {
-            if (_hooksInstalled)
-                return;
+            if (Hooks.TryGetValue(plugin, out hooks))
+                return hooks;
+
+            hooks = new PluginHooks();
 
             plugin.RegisterListener<OnMapStart>(_ => CleanupAll());
+            plugin.RegisterListener<OnTick>(() => TickPlugin(plugin));
             plugin.RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
-            _hooksInstalled = true;
+
+            // Warm the stored menu-type preference as soon as the client authorizes, so that
+            // opening a menu never has to wait on MySQL from the game thread.
+            plugin.RegisterListener<OnClientAuthorized>((_, steamId) => MenuTypeManager.Prefetch(steamId.SteamId64));
+
+            Hooks.Add(plugin, hooks);
+            return hooks;
         }
+    }
+
+    /// <summary>
+    /// Registers <c>css_0</c>..<c>css_9</c> once per plugin. Chat/console/center-HTML menus
+    /// are driven by these; the handler routes to whichever menu the caller currently has
+    /// open, so no per-instance commands are needed.
+    /// </summary>
+    private static void EnsureKeyCommands(BasePlugin plugin, PluginHooks hooks)
+    {
+        if (hooks.KeyCommandsRegistered)
+            return;
+
+        hooks.KeyCommandsRegistered = true;
+
+        for (int i = 0; i <= 9; i++)
+        {
+            int key = i;
+            plugin.AddCommand($"css_{i}", "CS2MenuManager menu key", (player, _) => OnKeyCommand(plugin, player, key));
+        }
+    }
+
+    private static void OnKeyCommand(BasePlugin plugin, CCSPlayerController? player, int key)
+    {
+        if (player == null)
+            return;
+
+        // Only the plugin that owns the active menu may drive it: several plugins can
+        // each have css_N registered and all of their handlers run for one key press.
+        if (GetActiveMenu(player) is not BaseMenuInstance instance || instance.Menu.Plugin != plugin)
+            return;
+
+        // WASD menus are driven by movement keys, never by css_N (matches the old
+        // behaviour, where they registered no key commands at all).
+        if (!instance.UsesKeyCommands)
+            return;
+
+        instance.OnKeyPress(player, key);
+    }
+
+    /// <summary>
+    /// Single per-plugin tick that drives every active menu instance owned by that plugin.
+    /// Replaces one native <c>OnTick</c> listener per open menu.
+    /// </summary>
+    private static void TickPlugin(BasePlugin plugin)
+    {
+        if (ActiveMenus.Count == 0)
+            return;
+
+        long start = Stopwatch.GetTimestamp();
+
+        TickBuffer.Clear();
+        foreach ((IMenuInstance Instance, Timer? _) in ActiveMenus.Values)
+            TickBuffer.Add(Instance);
+
+        int ticked = 0;
+        foreach (IMenuInstance menu in TickBuffer)
+        {
+            if (menu is not BaseMenuInstance instance || instance.Menu.Plugin != plugin)
+                continue;
+
+            ticked++;
+            instance.OnTickInternal();
+        }
+
+        TickBuffer.Clear();
+
+        double elapsedMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        if (elapsedMs > SlowCallbackThresholdMs)
+        {
+            plugin.Logger.LogWarning(
+                "[CS2MenuManager] OnTick took {ElapsedMs:F1} ms (ticked={Ticked}, activeMenus={Active}, players={Players})",
+                elapsedMs, ticked, ActiveMenus.Count, CountHumanPlayers());
+        }
+    }
+
+    private static int CountHumanPlayers()
+    {
+        int count = 0;
+        foreach (CCSPlayerController p in Utilities.GetPlayers())
+        {
+            if (!p.IsBot)
+                count++;
+        }
+
+        return count;
     }
 
     private static HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
@@ -38,6 +174,15 @@ public static class MenuManager
             return HookResult.Continue;
 
         ulong steamId = player.SteamID;
+
+        // Close (not just drop) so the instance runs its own teardown — WASD unfreeze,
+        // state save, center-HTML clear — exactly as the old per-instance disconnect hook did.
+        if (ActiveMenus.TryGetValue(steamId, out (IMenuInstance Instance, Timer? Timer) value))
+        {
+            value.Timer?.Kill();
+            value.Instance.Close(false);
+        }
+
         CleanupPlayer(steamId);
         return HookResult.Continue;
     }
@@ -56,6 +201,9 @@ public static class MenuManager
 
     internal static void CleanupAll()
     {
+        // Map change: the old player entities are gone, so instances are dropped rather than
+        // Close()d (Close reads the controller). Nothing leaks by dropping — instances no
+        // longer own native listeners/commands/hooks; those are per-plugin (EnsureHooks).
         foreach ((IMenuInstance _, Timer? Timer) in ActiveMenus.Values)
             Timer?.Kill();
 
@@ -91,10 +239,15 @@ public static class MenuManager
     /// <param name="player">The player controller.</param>
     public static void CloseActiveMenu(CCSPlayerController player)
     {
+        CloseActiveMenu(player, exitSound: true);
+    }
+
+    private static void CloseActiveMenu(CCSPlayerController player, bool exitSound)
+    {
         if (!ActiveMenus.TryGetValue(player.SteamID, out (IMenuInstance Instance, Timer? Timer) value))
             return;
 
-        value.Instance.Close(true);
+        value.Instance.Close(exitSound);
         value.Timer?.Kill();
         value.Timer = null;
         ActiveMenus.Remove(player.SteamID);
@@ -128,7 +281,7 @@ public static class MenuManager
             return;
         }
 
-        EnsureHooks(menu.Plugin);
+        PluginHooks hooks = EnsureHooks(menu.Plugin);
         CloseActiveMenu(player);
 
         // Back-compat: honour the deprecated menu-level MenuTime only when no explicit duration was passed.
@@ -139,13 +292,25 @@ public static class MenuManager
 
         Server.NextFrame(() =>
         {
+            long start = Stopwatch.GetTimestamp();
+
+            if (!player.IsValid)
+                return;
+
+            // Two Display() calls for the same player in one frame both pass the synchronous
+            // CloseActiveMenu above; without this the second callback would overwrite the
+            // first instance in ActiveMenus and orphan it. Re-check now that we are actually
+            // about to install a new instance.
+            CloseActiveMenu(player, exitSound: false);
+
             IMenuInstance instance = createInstance.Invoke(player, menu);
 
             if (instance is BaseMenuInstance baseMenuInstance)
             {
                 baseMenuInstance.MenuTime = time;
-                baseMenuInstance.RegisterOnKeyPress();
-                baseMenuInstance.RegisterPlayerDisconnectEvent();
+
+                if (baseMenuInstance.UsesKeyCommands)
+                    EnsureKeyCommands(menu.Plugin, hooks);
 
                 if (firstItem.HasValue)
                 {
@@ -172,6 +337,14 @@ public static class MenuManager
             ActiveMenus[player.SteamID] = (instance, timer);
 
             instance.Display();
+
+            double elapsedMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+            if (elapsedMs > SlowCallbackThresholdMs)
+            {
+                menu.Plugin.Logger.LogWarning(
+                    "[CS2MenuManager] OpenMenu NextFrame took {ElapsedMs:F1} ms (menu={MenuType}, items={Items}, activeMenus={Active}, players={Players})",
+                    elapsedMs, menu.GetType().Name, menu.ItemOptions.Count, ActiveMenus.Count, CountHumanPlayers());
+            }
         });
     }
 

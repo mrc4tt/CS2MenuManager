@@ -4,7 +4,6 @@ using CounterStrikeSharp.API.Core;
 using CS2MenuManager.API.Class;
 using CS2MenuManager.API.Enum;
 using CS2MenuManager.API.Interface;
-using static CounterStrikeSharp.API.Core.Listeners;
 using static CS2MenuManager.API.Class.Buttons;
 using static CS2MenuManager.API.Class.ConfigManager;
 
@@ -80,8 +79,6 @@ public class WasdMenuInstance : BaseMenuInstance
     {
         if (Menu is not WasdMenu wasdMenu)
             return;
-
-        Menu.Plugin.RegisterListener<OnTick>(OnTick);
 
         _scrollUpKey = wasdMenu.WasdMenu_ScrollUpKey;
         _scrollDownKey = wasdMenu.WasdMenu_ScrollDownKey;
@@ -240,7 +237,6 @@ public class WasdMenuInstance : BaseMenuInstance
         SaveMenuState();
         
         base.Close(exitSound);
-        Menu.Plugin.RemoveListener<OnTick>(OnTick);
 
         if (Player.IsValid)
         {
@@ -254,8 +250,14 @@ public class WasdMenuInstance : BaseMenuInstance
         }
     }
 
+    internal override void OnTickInternal()
+    {
+        OnTick();
+    }
+
     /// <summary>
-    /// Handles the tick event for the menu.
+    /// Handles the tick event for the menu. Driven by <see cref="MenuManager"/>'s single
+    /// per-plugin tick listener; kept public for API compatibility.
     /// </summary>
     public void OnTick()
     {

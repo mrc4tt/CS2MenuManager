@@ -3,7 +3,6 @@ using CounterStrikeSharp.API.Core;
 using CS2MenuManager.API.Class;
 using CS2MenuManager.API.Enum;
 using CS2MenuManager.API.Interface;
-using static CounterStrikeSharp.API.Core.Listeners;
 
 namespace CS2MenuManager.API.Menu;
 
@@ -75,7 +74,6 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
     /// <param name="menu">The menu associated with this instance.</param>
     public CenterHtmlMenuInstance(CCSPlayerController player, IMenu menu) : base(player, menu)
     {
-        Menu.Plugin.RegisterListener<OnTick>(OnTick);
     }
 
     /// <summary>
@@ -89,8 +87,9 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
     /// <summary>
     /// Re-asserts the menu on the center HTML channel every tick so it survives other plugins
     /// writing to the same channel, but rebuilds the markup only when the menu state has changed.
+    /// Driven by <see cref="MenuManager"/>'s single per-plugin tick listener.
     /// </summary>
-    private void OnTick()
+    internal override void OnTickInternal()
     {
         if (Menu is not CenterHtmlMenu centerHtmlMenu)
             return;
@@ -142,7 +141,6 @@ public class CenterHtmlMenuInstance : BaseMenuInstance
     public override void Close(bool exitSound)
     {
         base.Close(exitSound);
-        Menu.Plugin.RemoveListener<OnTick>(OnTick);
         _html = string.Empty;
         _dirty = true;
 

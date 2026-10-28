@@ -7,19 +7,20 @@ namespace CS2MenuManager.API.Class;
 /// </summary>
 public abstract partial class BaseMenu
 {
+    // Writable public instance properties of BaseMenu, resolved once. PlayerMenu copies
+    // these on every open (game thread), so avoid re-reflecting the type each time.
+    private static readonly System.Reflection.PropertyInfo[] WritableSettings =
+        typeof(BaseMenu)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Where(p => p.CanWrite)
+            .ToArray();
+
     internal static void CopySettings(BaseMenu oldMenu, BaseMenu newMenu)
     {
-        System.Reflection.PropertyInfo[] properties = typeof(BaseMenu).GetProperties(
-            System.Reflection.BindingFlags.Public |
-            System.Reflection.BindingFlags.Instance);
-
-        foreach (System.Reflection.PropertyInfo property in properties)
+        foreach (System.Reflection.PropertyInfo property in WritableSettings)
         {
-            if (property.CanWrite)
-            {
-                object? value = property.GetValue(oldMenu);
-                property.SetValue(newMenu, value);
-            }
+            object? value = property.GetValue(oldMenu);
+            property.SetValue(newMenu, value);
         }
     }
 

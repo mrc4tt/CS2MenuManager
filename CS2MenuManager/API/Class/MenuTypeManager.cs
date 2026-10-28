@@ -1,4 +1,5 @@
-﻿using CounterStrikeSharp.API.Core;
+﻿using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
 using CS2MenuManager.API.Interface;
 using static CS2MenuManager.API.Class.ConfigManager;
 using static CS2MenuManager.API.Class.Database;
@@ -18,14 +19,58 @@ public static class MenuTypeManager
 {
     private static readonly Dictionary<ulong, Type> MenuTypes = [];
 
+    // SteamIDs with a preference lookup in flight, so a burst of menu opens does not queue one
+    // query per open.
+    private static readonly HashSet<ulong> PendingLookups = [];
+
     internal static void CleanupPlayer(ulong steamId)
     {
         MenuTypes.Remove(steamId);
+        PendingLookups.Remove(steamId);
     }
 
     internal static void CleanupAll()
     {
         MenuTypes.Clear();
+        PendingLookups.Clear();
+    }
+
+    /// <summary>
+    /// Warms the menu-type cache for a player from the database, off the game thread.
+    /// Called when a client authorizes, so the preference is in memory long before the player
+    /// can open a menu. No-op unless MySQL is configured — the local store is already in memory.
+    /// </summary>
+    internal static void Prefetch(ulong steamId)
+    {
+        if (!IsMYSQLSet || steamId == 0)
+            return;
+
+        if (MenuTypes.ContainsKey(steamId) || !PendingLookups.Add(steamId))
+            return;
+
+        Task.Run(async () =>
+        {
+            string? type = null;
+            try
+            {
+                type = await SelectMenu(steamId);
+            }
+            catch
+            {
+                // Fall through: the player keeps the default menu for this session.
+            }
+
+            // MenuTypes is game-thread state; do not write it from the worker.
+            Server.NextFrame(() =>
+            {
+                PendingLookups.Remove(steamId);
+
+                if (string.IsNullOrEmpty(type))
+                    return;
+
+                MenuTypes[steamId] = MenuTypesList.TryGetValue(type, out Type? resolved) ? resolved : GetDefaultMenu();
+            });
+        });
     }
 
     /// <summary>
@@ -42,17 +87,29 @@ public static class MenuTypeManager
     /// </summary>
     /// <param name="player">The player controller to look up.</param>
     /// <returns>
-    /// The player's preferred menu type if set; otherwise falls back to the default menu type.
-    /// Will query the database if MySQL is configured and no cached value exists.
+    /// The player's preferred menu type if known; otherwise the default menu type.
     /// </returns>
+    /// <remarks>
+    /// This never blocks. The MySQL path used to sit on
+    /// <c>SelectMenu(...).GetAwaiter().GetResult()</c>, which stalled the game thread on a
+    /// database round trip every time a player opened a menu — a server-wide freeze visible to
+    /// everyone as a lag spike. The preference is loaded once by <see cref="Prefetch"/> when the
+    /// client authorizes; if it has not landed yet (or the query failed) the default menu is
+    /// returned and the lookup is kicked off in the background for next time. The local store is
+    /// already in memory, so that path is unchanged.
+    /// </remarks>
     public static Type? GetPlayerMenuType(CCSPlayerController player)
     {
         if (MenuTypes.TryGetValue(player.SteamID, out Type? menuType))
             return menuType;
 
-        string? type = IsMYSQLSet
-            ? SelectMenu(player.SteamID).GetAwaiter().GetResult()
-            : LocalStore.Select(player.SteamID);
+        if (IsMYSQLSet)
+        {
+            Prefetch(player.SteamID);
+            return GetDefaultMenu();
+        }
+
+        string? type = LocalStore.Select(player.SteamID);
 
         if (string.IsNullOrEmpty(type))
             return GetDefaultMenu();
